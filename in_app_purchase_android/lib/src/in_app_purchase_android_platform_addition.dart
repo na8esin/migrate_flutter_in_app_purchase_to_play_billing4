@@ -153,4 +153,8 @@ class InAppPurchaseAndroidPlatformAddition
       {required String sku}) {
     return _billingClient.launchPriceChangeConfirmationFlow(sku: sku);
   }
+
+  Future<PurchasesHistoryResult> queryPurchaseHistory(SkuType skuType) {
+    return _billingClient.queryPurchaseHistory(skuType);
+  }
 }

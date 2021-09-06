@@ -19,6 +19,7 @@ import com.android.billingclient.api.AcknowledgePurchaseParams;
 import com.android.billingclient.api.AcknowledgePurchaseResponseListener;
 import com.android.billingclient.api.BillingClient;
 import com.android.billingclient.api.BillingClientStateListener;
+import com.android.billingclient.api.BillingFlowParams.SubscriptionUpdateParams;
 import com.android.billingclient.api.BillingFlowParams;
 import com.android.billingclient.api.BillingFlowParams.ProrationMode;
 import com.android.billingclient.api.BillingResult;
@@ -250,6 +251,17 @@ class MethodCallHandlerImpl
       return;
     }
 
+    // 追加しようとしているところ
+    // https://github.com/android/play-billing-samples/blob/f9ae2d55c3699474e26ca0185a5ff38afb9df153/ClassyTaxiAppKotlin/app/src/main/java/com/example/subscriptions/ui/BillingViewModel.kt#L241
+    //
+    BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
+            .setSubscriptionUpdateParams(SubscriptionUpdateParams.newBuilder()
+                    .setOldSkuPurchaseToken(purchaseToken)
+                    .setReplaceSkusProrationMode(ProrationMode.IMMEDIATE_WITH_TIME_PRORATION)
+                    .build())
+            .setSkuDetails(skuDetails)
+            .build();
+
     BillingFlowParams.Builder paramsBuilder =
         BillingFlowParams.newBuilder().setSkuDetails(skuDetails);
     if (accountId != null && !accountId.isEmpty()) {
@@ -258,12 +270,7 @@ class MethodCallHandlerImpl
     if (obfuscatedProfileId != null && !obfuscatedProfileId.isEmpty()) {
       paramsBuilder.setObfuscatedProfileId(obfuscatedProfileId);
     }
-    if (oldSku != null && !oldSku.isEmpty()) {
-      paramsBuilder.setOldSku(oldSku, purchaseToken);
-    }
-    // The proration mode value has to match one of the following declared in
-    // https://developer.android.com/reference/com/android/billingclient/api/BillingFlowParams.ProrationMode
-    paramsBuilder.setReplaceSkusProrationMode(prorationMode);
+
     result.success(
         Translator.fromBillingResult(
             billingClient.launchBillingFlow(activity, paramsBuilder.build())));

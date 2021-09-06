@@ -41,6 +41,8 @@ public class InAppPurchasePlugin implements FlutterPlugin, ActivityAware {
     static final String QUERY_PURCHASES = "BillingClient#queryPurchases(String)";
     static final String QUERY_PURCHASE_HISTORY_ASYNC =
         "BillingClient#queryPurchaseHistoryAsync(String, PurchaseHistoryResponseListener)";
+    static final String QUERY_PURCHASE_ASYNC =
+            "BillingClient#queryPurchaseAsync(String, PurchasesResponseListener)";
     static final String CONSUME_PURCHASE_ASYNC =
         "BillingClient#consumeAsync(String, ConsumeResponseListener)";
     static final String ACKNOWLEDGE_PURCHASE =

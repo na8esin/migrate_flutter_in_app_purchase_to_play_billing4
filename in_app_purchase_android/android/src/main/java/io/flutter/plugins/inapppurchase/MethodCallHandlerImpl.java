@@ -257,23 +257,16 @@ class MethodCallHandlerImpl
     BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
             .setSubscriptionUpdateParams(SubscriptionUpdateParams.newBuilder()
                     .setOldSkuPurchaseToken(purchaseToken)
-                    .setReplaceSkusProrationMode(ProrationMode.IMMEDIATE_WITH_TIME_PRORATION)
+                    .setReplaceSkusProrationMode(prorationMode)
                     .build())
             .setSkuDetails(skuDetails)
+            .setObfuscatedAccountId(accountId)
+            .setObfuscatedProfileId(obfuscatedProfileId)
             .build();
-
-    BillingFlowParams.Builder paramsBuilder =
-        BillingFlowParams.newBuilder().setSkuDetails(skuDetails);
-    if (accountId != null && !accountId.isEmpty()) {
-      paramsBuilder.setObfuscatedAccountId(accountId);
-    }
-    if (obfuscatedProfileId != null && !obfuscatedProfileId.isEmpty()) {
-      paramsBuilder.setObfuscatedProfileId(obfuscatedProfileId);
-    }
 
     result.success(
         Translator.fromBillingResult(
-            billingClient.launchBillingFlow(activity, paramsBuilder.build())));
+            billingClient.launchBillingFlow(activity, billingFlowParams)));
   }
 
   private void consumeAsync(String purchaseToken, final MethodChannel.Result result) {

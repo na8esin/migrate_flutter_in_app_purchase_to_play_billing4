@@ -108,22 +108,28 @@ class MethodCallHandlerImpl
   public void onMethodCall(MethodCall call, MethodChannel.Result result) {
     switch (call.method) {
       case InAppPurchasePlugin.MethodNames.IS_READY:
+        Log.d(TAG, InAppPurchasePlugin.MethodNames.IS_READY);
         isReady(result);
         break;
       case InAppPurchasePlugin.MethodNames.START_CONNECTION:
+        Log.d(TAG, "start connection.");
         startConnection(
             (int) call.argument("handle"),
             (boolean) call.argument("enablePendingPurchases"),
             result);
+        Log.d(TAG, "start connection end.");
         break;
       case InAppPurchasePlugin.MethodNames.END_CONNECTION:
+        Log.d(TAG, "end connection.");
         endConnection(result);
         break;
       case InAppPurchasePlugin.MethodNames.QUERY_SKU_DETAILS:
+        Log.d(TAG, InAppPurchasePlugin.MethodNames.QUERY_SKU_DETAILS);
         List<String> skusList = call.argument("skusList");
         querySkuDetailsAsync((String) call.argument("skuType"), skusList, result);
         break;
       case InAppPurchasePlugin.MethodNames.LAUNCH_BILLING_FLOW:
+        Log.d(TAG, InAppPurchasePlugin.MethodNames.LAUNCH_BILLING_FLOW);
         launchBillingFlow(
             (String) call.argument("sku"),
             (String) call.argument("accountId"),
@@ -136,6 +142,8 @@ class MethodCallHandlerImpl
             result);
         break;
       case InAppPurchasePlugin.MethodNames.QUERY_PURCHASES:
+        // restorePurchases()もここ
+        Log.d(TAG, InAppPurchasePlugin.MethodNames.QUERY_PURCHASES);
         queryPurchases((String) call.argument("skuType"), result);
         break;
       case InAppPurchasePlugin.MethodNames.QUERY_PURCHASE_HISTORY_ASYNC:
@@ -188,17 +196,15 @@ class MethodCallHandlerImpl
         SkuDetailsParams.newBuilder().setType(skuType).setSkusList(skusList).build();
     billingClient.querySkuDetailsAsync(
         params,
-        new SkuDetailsResponseListener() {
-          @Override
-          public void onSkuDetailsResponse(
-              BillingResult billingResult, List<SkuDetails> skuDetailsList) {
-            updateCachedSkus(skuDetailsList);
-            final Map<String, Object> skuDetailsResponse = new HashMap<>();
-            skuDetailsResponse.put("billingResult", Translator.fromBillingResult(billingResult));
-            skuDetailsResponse.put("skuDetailsList", fromSkuDetailsList(skuDetailsList));
-            result.success(skuDetailsResponse);
-          }
-        });
+            (billingResult, skuDetailsList) -> activity.runOnUiThread(() -> {
+              Log.d(TAG, "welcome. querySkuDetailsAsync skuDetailsResponseListener");
+              updateCachedSkus(skuDetailsList);
+              final Map<String, Object> skuDetailsResponse = new HashMap<>();
+              skuDetailsResponse.put("billingResult", Translator.fromBillingResult(billingResult));
+              skuDetailsResponse.put("skuDetailsList", fromSkuDetailsList(skuDetailsList));
+              Log.d(TAG, "querySkuDetailsAsync: " + skuDetailsResponse);
+              result.success(skuDetailsResponse);
+            }));
   }
 
   private void launchBillingFlow(
@@ -254,11 +260,14 @@ class MethodCallHandlerImpl
     // 追加しようとしているところ
     // https://github.com/android/play-billing-samples/blob/f9ae2d55c3699474e26ca0185a5ff38afb9df153/ClassyTaxiAppKotlin/app/src/main/java/com/example/subscriptions/ui/BillingViewModel.kt#L241
     //
+    SubscriptionUpdateParams.Builder subscriptionUpdateParams = SubscriptionUpdateParams.newBuilder();
+    if (purchaseToken != null) {
+      subscriptionUpdateParams.setOldSkuPurchaseToken(purchaseToken);
+    }
+    subscriptionUpdateParams.setReplaceSkusProrationMode(prorationMode);
+
     BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
-            .setSubscriptionUpdateParams(SubscriptionUpdateParams.newBuilder()
-                    .setOldSkuPurchaseToken(purchaseToken)
-                    .setReplaceSkusProrationMode(prorationMode)
-                    .build())
+            .setSubscriptionUpdateParams(subscriptionUpdateParams.build())
             .setSkuDetails(skuDetails)
             .setObfuscatedAccountId(accountId)
             .setObfuscatedProfileId(obfuscatedProfileId)
@@ -333,14 +342,18 @@ class MethodCallHandlerImpl
 
           @Override
           public void onBillingSetupFinished(BillingResult billingResult) {
-            if (alreadyFinished) {
-              Log.d(TAG, "Tried to call onBillingSetupFinished multiple times.");
-              return;
-            }
-            alreadyFinished = true;
-            // Consider the fact that we've finished a success, leave it to the Dart side to
-            // validate the responseCode.
-            result.success(Translator.fromBillingResult(billingResult));
+            activity.runOnUiThread(()->{
+              Log.d(TAG, "onBillingSetupFinished");
+              if (alreadyFinished) {
+                Log.d(TAG, "Tried to call onBillingSetupFinished multiple times.");
+                return;
+              }
+              alreadyFinished = true;
+              // Consider the fact that we've finished a success, leave it to the Dart side to
+              // validate the responseCode.
+              Log.d(TAG, "onBillingSetupFinished: " + Translator.fromBillingResult(billingResult));
+              result.success(Translator.fromBillingResult(billingResult));
+            });
           }
 
           @Override

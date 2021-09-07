@@ -99,6 +99,7 @@ class InAppPurchaseAndroidPlatform extends InAppPurchasePlatform {
             skuDetailsList: [])
       ];
     }
+
     List<ProductDetails> productDetailsList =
         responses.expand((SkuDetailsResponseWrapper response) {
       return response.skuDetailsList;

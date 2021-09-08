@@ -4,17 +4,21 @@
 
 package io.flutter.plugins.inapppurchase;
 
+import static io.flutter.plugins.inapppurchase.Translator.fromSkuDetailsList;
+
 import android.content.Context;
 import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.android.billingclient.api.BillingClient;
 import com.android.billingclient.api.BillingResult;
 import com.android.billingclient.api.SkuDetails;
+import com.android.billingclient.api.SkuDetailsParams;
 import com.android.billingclient.api.SkuDetailsResponseListener;
 
 import java.util.HashMap;
@@ -28,24 +32,32 @@ final class BillingClientFactoryImpl implements BillingClientFactory, SkuDetails
 
   private static final String TAG = "BillingClientFactory";
   private static final long SKU_DETAILS_REQUERY_TIME = 1000L * 60L * 60L * 4L; // 4 hours
-  final private Map<String, MutableLiveData<SkuDetails>> skuDetailsLiveDataMap = new HashMap<>();
-  // when was the last successful SkuDetailsResponse?
   private long skuDetailsResponseTime = -SKU_DETAILS_REQUERY_TIME;
+
+  private MutableLiveData<Map<String, Object>> skuDetailsListLiveData = new MutableLiveData();
+  private HashMap<String, SkuDetails> cachedSkus = new HashMap<>();
+
+  // Billing client, connection, cached data
+  private BillingClient billingClient;
 
   @Override
   public BillingClient createBillingClient(
-      Context context, MethodChannel channel, boolean enablePendingPurchases) {
+      Context context,
+      MethodChannel channel,
+      boolean enablePendingPurchases
+  ) {
     BillingClient.Builder builder = BillingClient.newBuilder(context);
     if (enablePendingPurchases) {
       builder.enablePendingPurchases();
     }
-    return builder.setListener(new PluginPurchaseListener(channel)).build();
+    billingClient = builder.setListener(new PluginPurchaseListener(channel)).build();
+    return billingClient;
   }
 
   /**
    * https://github.com/android/play-billing-samples/blob/main/TrivialDriveJava/app/src/main/java/com/sample/android/trivialdrivesample/billing/BillingDataSource.java#L358
    * @param billingResult
-   * @param list
+   * @param skuDetailsList
    */
   @Override
   public void onSkuDetailsResponse(@NonNull BillingResult billingResult,
@@ -55,22 +67,20 @@ final class BillingClientFactoryImpl implements BillingClientFactory, SkuDetails
     switch (responseCode) {
       case BillingClient.BillingResponseCode.OK:
         Log.i(TAG, "onSkuDetailsResponse: " + responseCode + " " + debugMessage);
+        Map<String, Object> res;
         if (skuDetailsList == null || skuDetailsList.isEmpty()) {
           Log.e(TAG, "onSkuDetailsResponse: " +
                   "Found null or empty SkuDetails. " +
                   "Check to see if the SKUs you requested are correctly published " +
                   "in the Google Play Console.");
+          res = new HashMap<>();
         } else {
-          for (SkuDetails skuDetails : skuDetailsList) {
-            String sku = skuDetails.getSku();
-            MutableLiveData<SkuDetails> detailsMutableLiveData =
-                    skuDetailsLiveDataMap.get(sku);
-            if (null != detailsMutableLiveData) {
-              detailsMutableLiveData.postValue(skuDetails);
-            } else {
-              Log.e(TAG, "Unknown sku: " + sku);
-            }
-          }
+          // キャッシュチェック
+          updateCachedSkus(skuDetailsList);
+          res = skuDetailsListTranslator(skuDetailsList, billingResult);
+        }
+        if (res != null) {
+          skuDetailsListLiveData.postValue(res);
         }
         break;
       case BillingClient.BillingResponseCode.SERVICE_DISCONNECTED:
@@ -96,5 +106,49 @@ final class BillingClientFactoryImpl implements BillingClientFactory, SkuDetails
     } else {
       skuDetailsResponseTime = -SKU_DETAILS_REQUERY_TIME;
     }
+  }
+
+  public LiveData<Map<String, Object>> getSkuDetailsList() {
+    return skuDetailsListLiveData;
+  }
+
+  private Map<String, Object> skuDetailsListTranslator(
+          List<SkuDetails> skuDetailsList,
+          BillingResult billingResult) {
+    final Map<String, Object> skuDetailsResponse = new HashMap<>();
+    skuDetailsResponse.put("billingResult", Translator.fromBillingResult(billingResult));
+    skuDetailsResponse.put("skuDetailsList", fromSkuDetailsList(skuDetailsList));
+    return skuDetailsResponse;
+  }
+
+  /**
+   * Calls the billing client functions to query sku details for both the inapp and subscription
+   * SKUs. SKU details are useful for displaying item names and price lists to the user, and are
+   * required to make a purchase.
+   *
+   * MethodCallHandlerImplから呼ぶ？
+   */
+  public void querySkuDetailsAsync(final String skuType, final List<String> skusList) {
+    Log.d(TAG, skuType);
+    Log.d(TAG, skusList.toString());
+    billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder()
+            .setType(skuType)
+            .setSkusList(skusList)
+            .build(), this);
+  }
+
+  private void updateCachedSkus(@Nullable List<SkuDetails> skuDetailsList) {
+    if (skuDetailsList == null) {
+      return;
+    }
+
+    // 結局ここにfor文が来るのか
+    for (SkuDetails skuDetails : skuDetailsList) {
+      cachedSkus.put(skuDetails.getSku(), skuDetails);
+    }
+  }
+
+  public HashMap<String, SkuDetails> getCachedSkus() {
+    return cachedSkus;
   }
 }

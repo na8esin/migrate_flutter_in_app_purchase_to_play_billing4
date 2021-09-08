@@ -11,10 +11,17 @@ import static io.flutter.plugins.inapppurchase.Translator.fromSkuDetailsList;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.nfc.Tag;
 import android.os.Bundle;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.lifecycle.DefaultLifecycleObserver;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.Observer;
+
 import com.android.billingclient.api.AcknowledgePurchaseParams;
 import com.android.billingclient.api.AcknowledgePurchaseResponseListener;
 import com.android.billingclient.api.BillingClient;
@@ -39,7 +46,9 @@ import java.util.Map;
 
 /** Handles method channel for the plugin. */
 class MethodCallHandlerImpl
-    implements MethodChannel.MethodCallHandler, Application.ActivityLifecycleCallbacks {
+    implements MethodChannel.MethodCallHandler,
+        Application.ActivityLifecycleCallbacks
+{
 
   private static final String TAG = "InAppPurchasePlugin";
   private static final String LOAD_SKU_DOC_URL =
@@ -52,7 +61,7 @@ class MethodCallHandlerImpl
   private final Context applicationContext;
   private final MethodChannel methodChannel;
 
-  private HashMap<String, SkuDetails> cachedSkus = new HashMap<>();
+
 
   /** Constructs the MethodCallHandlerImpl */
   MethodCallHandlerImpl(
@@ -108,28 +117,24 @@ class MethodCallHandlerImpl
   public void onMethodCall(MethodCall call, MethodChannel.Result result) {
     switch (call.method) {
       case InAppPurchasePlugin.MethodNames.IS_READY:
-        Log.d(TAG, InAppPurchasePlugin.MethodNames.IS_READY);
         isReady(result);
         break;
       case InAppPurchasePlugin.MethodNames.START_CONNECTION:
-        Log.d(TAG, "start connection.");
         startConnection(
             (int) call.argument("handle"),
             (boolean) call.argument("enablePendingPurchases"),
             result);
-        Log.d(TAG, "start connection end.");
         break;
       case InAppPurchasePlugin.MethodNames.END_CONNECTION:
-        Log.d(TAG, "end connection.");
         endConnection(result);
         break;
       case InAppPurchasePlugin.MethodNames.QUERY_SKU_DETAILS:
-        Log.d(TAG, InAppPurchasePlugin.MethodNames.QUERY_SKU_DETAILS);
+        /* querySkuDetailsAsync */
         List<String> skusList = call.argument("skusList");
+        skuResult = result;
         querySkuDetailsAsync((String) call.argument("skuType"), skusList, result);
         break;
       case InAppPurchasePlugin.MethodNames.LAUNCH_BILLING_FLOW:
-        Log.d(TAG, InAppPurchasePlugin.MethodNames.LAUNCH_BILLING_FLOW);
         launchBillingFlow(
             (String) call.argument("sku"),
             (String) call.argument("accountId"),
@@ -143,7 +148,6 @@ class MethodCallHandlerImpl
         break;
       case InAppPurchasePlugin.MethodNames.QUERY_PURCHASES:
         // restorePurchases()もここ
-        Log.d(TAG, InAppPurchasePlugin.MethodNames.QUERY_PURCHASES);
         queryPurchases((String) call.argument("skuType"), result);
         break;
       case InAppPurchasePlugin.MethodNames.QUERY_PURCHASE_HISTORY_ASYNC:
@@ -187,26 +191,17 @@ class MethodCallHandlerImpl
   }
 
   private void querySkuDetailsAsync(
-      final String skuType, final List<String> skusList, final MethodChannel.Result result) {
+      final String skuType,
+      final List<String> skusList,
+      final MethodChannel.Result result) {
     if (billingClientError(result)) {
       return;
     }
 
-    SkuDetailsParams params =
-        SkuDetailsParams.newBuilder().setType(skuType).setSkusList(skusList).build();
-    billingClient.querySkuDetailsAsync(
-        params,
-            (billingResult, skuDetailsList) -> activity.runOnUiThread(() -> {
-              Log.d(TAG, "welcome. querySkuDetailsAsync skuDetailsResponseListener");
-              updateCachedSkus(skuDetailsList);
-              final Map<String, Object> skuDetailsResponse = new HashMap<>();
-              skuDetailsResponse.put("billingResult", Translator.fromBillingResult(billingResult));
-              skuDetailsResponse.put("skuDetailsList", fromSkuDetailsList(skuDetailsList));
-              Log.d(TAG, "querySkuDetailsAsync: " + skuDetailsResponse);
-
-              result.success(skuDetailsResponse);
-            }));
+    billingClientFactory.querySkuDetailsAsync(skuType, skusList);
   }
+
+  private HashMap<String, SkuDetails> cachedSkus = new HashMap<>();
 
   private void launchBillingFlow(
       String sku,
@@ -329,12 +324,34 @@ class MethodCallHandlerImpl
         });
   }
 
+  MethodChannel.Result skuResult;
+
   private void startConnection(
-      final int handle, final boolean enablePendingPurchases, final MethodChannel.Result result) {
+      final int handle,
+      final boolean enablePendingPurchases,
+      final MethodChannel.Result result) {
+
     if (billingClient == null) {
       billingClient =
           billingClientFactory.createBillingClient(
               applicationContext, methodChannel, enablePendingPurchases);
+    }
+
+    if (activity instanceof LifecycleOwner) {
+      Log.d(TAG, "activity instanceof LifecycleOwner");
+      final Observer<Map<String, Object>> skuDetailsResponseObserver
+              = skuDetailsList -> {
+        if (skuResult != null) {
+          skuResult.success(skuDetailsList);
+        } else {
+          Log.d(TAG, "skuResult is null.");
+        }
+      };
+      billingClientFactory
+              .getSkuDetailsList()
+              .observe((LifecycleOwner) activity, skuDetailsResponseObserver);
+    } else {
+      Log.d(TAG, "not activity instanceof LifecycleOwner");
     }
 
     billingClient.startConnection(
@@ -344,7 +361,6 @@ class MethodCallHandlerImpl
           @Override
           public void onBillingSetupFinished(BillingResult billingResult) {
             activity.runOnUiThread(()->{
-              Log.d(TAG, "onBillingSetupFinished");
               if (alreadyFinished) {
                 Log.d(TAG, "Tried to call onBillingSetupFinished multiple times.");
                 return;
@@ -352,7 +368,6 @@ class MethodCallHandlerImpl
               alreadyFinished = true;
               // Consider the fact that we've finished a success, leave it to the Dart side to
               // validate the responseCode.
-              Log.d(TAG, "onBillingSetupFinished: " + Translator.fromBillingResult(billingResult));
               result.success(Translator.fromBillingResult(billingResult));
             });
           }
@@ -380,16 +395,6 @@ class MethodCallHandlerImpl
             result.success(Translator.fromBillingResult(billingResult));
           }
         });
-  }
-
-  private void updateCachedSkus(@Nullable List<SkuDetails> skuDetailsList) {
-    if (skuDetailsList == null) {
-      return;
-    }
-
-    for (SkuDetails skuDetails : skuDetailsList) {
-      cachedSkus.put(skuDetails.getSku(), skuDetails);
-    }
   }
 
   private void launchPriceChangeConfirmationFlow(String sku, MethodChannel.Result result) {

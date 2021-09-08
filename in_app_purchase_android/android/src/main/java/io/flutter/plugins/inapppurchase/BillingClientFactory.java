@@ -6,7 +6,13 @@ package io.flutter.plugins.inapppurchase;
 
 import android.content.Context;
 import androidx.annotation.NonNull;
+import androidx.lifecycle.LiveData;
+
 import com.android.billingclient.api.BillingClient;
+
+import java.util.List;
+import java.util.Map;
+
 import io.flutter.plugin.common.MethodChannel;
 
 /** Responsible for creating a {@link BillingClient} object. */
@@ -22,5 +28,11 @@ interface BillingClientFactory {
    * @return The {@link BillingClient} object that is created.
    */
   BillingClient createBillingClient(
-      @NonNull Context context, @NonNull MethodChannel channel, boolean enablePendingPurchases);
+      @NonNull Context context,
+      @NonNull MethodChannel channel,
+      boolean enablePendingPurchases);
+
+  void querySkuDetailsAsync(final String skuType, final List<String> skusList);
+
+  public LiveData<Map<String, Object>> getSkuDetailsList();
 }

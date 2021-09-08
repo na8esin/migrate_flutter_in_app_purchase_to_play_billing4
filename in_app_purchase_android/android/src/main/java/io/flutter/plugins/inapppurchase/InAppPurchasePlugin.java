@@ -7,8 +7,20 @@ package io.flutter.plugins.inapppurchase;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.util.Log;
+
 import androidx.annotation.VisibleForTesting;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.Observer;
+
 import com.android.billingclient.api.BillingClient;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.activity.ActivityAware;
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
@@ -24,6 +36,7 @@ public class InAppPurchasePlugin implements FlutterPlugin, ActivityAware {
   // a unit test to make sure. If there is a strong reason to change the <package> value, please inform the
   // code owner of this package.
   static final String PROXY_VALUE = "io.flutter.plugins.inapppurchase";
+  static final private String TAG = "InAppPurchasePlugin";
 
   @VisibleForTesting
   static final class MethodNames {

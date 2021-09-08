@@ -203,6 +203,7 @@ class MethodCallHandlerImpl
               skuDetailsResponse.put("billingResult", Translator.fromBillingResult(billingResult));
               skuDetailsResponse.put("skuDetailsList", fromSkuDetailsList(skuDetailsList));
               Log.d(TAG, "querySkuDetailsAsync: " + skuDetailsResponse);
+
               result.success(skuDetailsResponse);
             }));
   }

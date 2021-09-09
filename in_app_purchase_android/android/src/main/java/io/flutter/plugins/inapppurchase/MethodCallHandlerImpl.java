@@ -61,8 +61,6 @@ class MethodCallHandlerImpl
   private final Context applicationContext;
   private final MethodChannel methodChannel;
 
-
-
   /** Constructs the MethodCallHandlerImpl */
   MethodCallHandlerImpl(
       @Nullable Activity activity,
@@ -128,10 +126,28 @@ class MethodCallHandlerImpl
       case InAppPurchasePlugin.MethodNames.END_CONNECTION:
         endConnection(result);
         break;
-      case InAppPurchasePlugin.MethodNames.QUERY_SKU_DETAILS:
-        /* querySkuDetailsAsync */
+      case InAppPurchasePlugin.MethodNames.QUERY_SKU_DETAILS:/* querySkuDetailsAsync */
+
+        // Observer登録
+        final Observer<Map<String, Object>> skuDetailsResponseObserver
+                = skuDetailsList -> {
+          if (result != null) {
+            try {
+              result.success(skuDetailsList);
+            } catch (IllegalStateException e) {
+              Log.d(TAG,
+                      "ignoring exception: $e. See https://github.com/flutter/flutter/issues/29092 for details.");
+            }
+          } else {
+            Log.d(TAG, "skuResult is null.");
+          }
+        };
+        // LiveData を監視
+        billingClientFactory
+                .getSkuDetailsList()
+                .observe((LifecycleOwner) activity, skuDetailsResponseObserver);
+
         List<String> skusList = call.argument("skusList");
-        skuResult = result;
         querySkuDetailsAsync((String) call.argument("skuType"), skusList, result);
         break;
       case InAppPurchasePlugin.MethodNames.LAUNCH_BILLING_FLOW:
@@ -324,8 +340,6 @@ class MethodCallHandlerImpl
         });
   }
 
-  MethodChannel.Result skuResult;
-
   private void startConnection(
       final int handle,
       final boolean enablePendingPurchases,
@@ -335,23 +349,6 @@ class MethodCallHandlerImpl
       billingClient =
           billingClientFactory.createBillingClient(
               applicationContext, methodChannel, enablePendingPurchases);
-    }
-
-    if (activity instanceof LifecycleOwner) {
-      Log.d(TAG, "activity instanceof LifecycleOwner");
-      final Observer<Map<String, Object>> skuDetailsResponseObserver
-              = skuDetailsList -> {
-        if (skuResult != null) {
-          skuResult.success(skuDetailsList);
-        } else {
-          Log.d(TAG, "skuResult is null.");
-        }
-      };
-      billingClientFactory
-              .getSkuDetailsList()
-              .observe((LifecycleOwner) activity, skuDetailsResponseObserver);
-    } else {
-      Log.d(TAG, "not activity instanceof LifecycleOwner");
     }
 
     billingClient.startConnection(

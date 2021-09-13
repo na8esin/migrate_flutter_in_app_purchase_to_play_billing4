@@ -6,21 +6,16 @@ package io.flutter.plugins.inapppurchase;
 
 import static io.flutter.plugins.inapppurchase.Translator.fromPurchaseHistoryRecordList;
 import static io.flutter.plugins.inapppurchase.Translator.fromPurchasesResult;
-import static io.flutter.plugins.inapppurchase.Translator.fromSkuDetailsList;
 
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
-import android.nfc.Tag;
 import android.os.Bundle;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.lifecycle.DefaultLifecycleObserver;
-import androidx.lifecycle.LifecycleOwner;
-import androidx.lifecycle.LiveData;
-import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.android.billingclient.api.AcknowledgePurchaseParams;
 import com.android.billingclient.api.AcknowledgePurchaseResponseListener;
@@ -36,8 +31,6 @@ import com.android.billingclient.api.PriceChangeFlowParams;
 import com.android.billingclient.api.PurchaseHistoryRecord;
 import com.android.billingclient.api.PurchaseHistoryResponseListener;
 import com.android.billingclient.api.SkuDetails;
-import com.android.billingclient.api.SkuDetailsParams;
-import com.android.billingclient.api.SkuDetailsResponseListener;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import java.util.HashMap;
@@ -143,9 +136,7 @@ class MethodCallHandlerImpl
           }
         };
         // LiveData を監視
-        billingClientFactory
-                .getSkuDetailsList()
-                .observe((LifecycleOwner) activity, skuDetailsResponseObserver);
+
 
         List<String> skusList = call.argument("skusList");
         querySkuDetailsAsync((String) call.argument("skuType"), skusList, result);

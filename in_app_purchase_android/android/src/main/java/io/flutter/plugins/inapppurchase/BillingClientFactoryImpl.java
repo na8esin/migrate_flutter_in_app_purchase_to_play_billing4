@@ -55,6 +55,8 @@ final class BillingClientFactoryImpl implements BillingClientFactory, SkuDetails
   }
 
   /**
+   * Receives the result from {@link #querySkuDetailsAsync(String, List)}.
+   *
    * https://github.com/android/play-billing-samples/blob/main/TrivialDriveJava/app/src/main/java/com/sample/android/trivialdrivesample/billing/BillingDataSource.java#L358
    * @param billingResult
    * @param skuDetailsList
@@ -66,7 +68,7 @@ final class BillingClientFactoryImpl implements BillingClientFactory, SkuDetails
     String debugMessage = billingResult.getDebugMessage();
     switch (responseCode) {
       case BillingClient.BillingResponseCode.OK:
-        Log.i(TAG, "onSkuDetailsResponse: " + responseCode + " " + debugMessage);
+
         Map<String, Object> res;
         if (skuDetailsList == null || skuDetailsList.isEmpty()) {
           Log.e(TAG, "onSkuDetailsResponse: " +
@@ -80,6 +82,10 @@ final class BillingClientFactoryImpl implements BillingClientFactory, SkuDetails
           res = skuDetailsListTranslator(skuDetailsList, billingResult);
         }
         if (res != null) {
+          // classytaxiではMutableStateFlow<SkuDetails?>
+          // https://github.com/android/play-billing-samples/blob/8f8792fe23e343883984f361a5ecb56e70653911/TrivialDriveKotlin/app/src/main/java/com/sample/android/trivialdrivesample/billing/BillingDataSource.kt#L298
+          // javaだとLiveData
+          // https://github.com/android/play-billing-samples/blob/f9ae2d55c3699474e26ca0185a5ff38afb9df153/TrivialDriveJava/app/src/main/java/com/sample/android/trivialdrivesample/billing/BillingDataSource.java#L376
           skuDetailsListLiveData.postValue(res);
         }
         break;
@@ -129,8 +135,6 @@ final class BillingClientFactoryImpl implements BillingClientFactory, SkuDetails
    * MethodCallHandlerImplから呼ぶ？
    */
   public void querySkuDetailsAsync(final String skuType, final List<String> skusList) {
-    Log.d(TAG, skuType);
-    Log.d(TAG, skusList.toString());
     billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder()
             .setType(skuType)
             .setSkusList(skusList)

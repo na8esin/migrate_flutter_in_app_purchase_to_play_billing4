@@ -26,11 +26,8 @@ import com.android.billingclient.api.BillingResult;
 import com.android.billingclient.api.ConsumeParams;
 import com.android.billingclient.api.ConsumeResponseListener;
 import com.android.billingclient.api.PriceChangeFlowParams;
-import com.android.billingclient.api.PurchaseHistoryRecord;
-import com.android.billingclient.api.PurchaseHistoryResponseListener;
 import com.android.billingclient.api.SkuDetails;
 import com.android.billingclient.api.SkuDetailsParams;
-import com.android.billingclient.api.SkuDetailsResponseListener;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import java.util.HashMap;
@@ -261,18 +258,22 @@ class MethodCallHandlerImpl
     // 追加しようとしているところ
     // https://github.com/android/play-billing-samples/blob/f9ae2d55c3699474e26ca0185a5ff38afb9df153/ClassyTaxiAppKotlin/app/src/main/java/com/example/subscriptions/ui/BillingViewModel.kt#L241
     //
-    SubscriptionUpdateParams.Builder subscriptionUpdateParams = SubscriptionUpdateParams.newBuilder();
+    SubscriptionUpdateParams.Builder subscriptionUpdateParams
+            = SubscriptionUpdateParams.newBuilder();
+
+    BillingFlowParams.Builder billingBuilder
+            = BillingFlowParams.newBuilder().setSkuDetails(skuDetails);
     if (purchaseToken != null) {
       subscriptionUpdateParams.setOldSkuPurchaseToken(purchaseToken);
-    }
-    subscriptionUpdateParams.setReplaceSkusProrationMode(prorationMode);
+      subscriptionUpdateParams.setReplaceSkusProrationMode(prorationMode);
 
-    BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
-            .setSubscriptionUpdateParams(subscriptionUpdateParams.build())
-            .setSkuDetails(skuDetails)
-            .setObfuscatedAccountId(accountId)
-            .setObfuscatedProfileId(obfuscatedProfileId)
-            .build();
+      billingBuilder
+              .setSubscriptionUpdateParams(subscriptionUpdateParams.build())
+              .setObfuscatedAccountId(accountId)
+              .setObfuscatedProfileId(obfuscatedProfileId);
+    }
+
+    BillingFlowParams billingFlowParams = billingBuilder.build();
 
     result.success(
         Translator.fromBillingResult(

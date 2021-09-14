@@ -26,6 +26,7 @@ import com.android.billingclient.api.BillingResult;
 import com.android.billingclient.api.ConsumeParams;
 import com.android.billingclient.api.ConsumeResponseListener;
 import com.android.billingclient.api.PriceChangeFlowParams;
+import com.android.billingclient.api.Purchase;
 import com.android.billingclient.api.SkuDetails;
 import com.android.billingclient.api.SkuDetailsParams;
 import io.flutter.plugin.common.MethodCall;
@@ -302,7 +303,17 @@ class MethodCallHandlerImpl
 
     // Like in our connect call, consider the billing client responding a "success" here regardless
     // of status code.
-    result.success(fromPurchasesResult(billingClient.queryPurchases(skuType)));
+
+    billingClient.queryPurchasesAsync(skuType,(billingResult, list) -> {
+      if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) {
+        Log.e(TAG, "Problem getting purchases: " +
+                billingResult.getDebugMessage());
+      } else {
+        activity.runOnUiThread(()->{
+          result.success(fromPurchasesResult(new Purchase.PurchasesResult(billingResult, list)));
+        });
+      }
+    });
   }
 
   private void queryPurchaseHistoryAsync(String skuType, final MethodChannel.Result result) {

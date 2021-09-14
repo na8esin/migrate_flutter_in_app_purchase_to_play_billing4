@@ -285,12 +285,7 @@ class MethodCallHandlerImpl
     }
 
     ConsumeResponseListener listener =
-        new ConsumeResponseListener() {
-          @Override
-          public void onConsumeResponse(BillingResult billingResult, String outToken) {
-            result.success(Translator.fromBillingResult(billingResult));
-          }
-        };
+            (billingResult, outToken) -> result.success(Translator.fromBillingResult(billingResult));
     ConsumeParams.Builder paramsBuilder =
         ConsumeParams.newBuilder().setPurchaseToken(purchaseToken);
 
@@ -316,17 +311,13 @@ class MethodCallHandlerImpl
 
     billingClient.queryPurchaseHistoryAsync(
         skuType,
-        new PurchaseHistoryResponseListener() {
-          @Override
-          public void onPurchaseHistoryResponse(
-              BillingResult billingResult, List<PurchaseHistoryRecord> purchasesList) {
-            final Map<String, Object> serialized = new HashMap<>();
-            serialized.put("billingResult", Translator.fromBillingResult(billingResult));
-            serialized.put(
-                "purchaseHistoryRecordList", fromPurchaseHistoryRecordList(purchasesList));
-            result.success(serialized);
-          }
-        });
+            (billingResult, purchasesList) -> {
+              final Map<String, Object> serialized = new HashMap<>();
+              serialized.put("billingResult", Translator.fromBillingResult(billingResult));
+              serialized.put(
+                  "purchaseHistoryRecordList", fromPurchaseHistoryRecordList(purchasesList));
+              result.success(serialized);
+            });
   }
 
   private void startConnection(
